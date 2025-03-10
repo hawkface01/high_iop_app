@@ -1,0 +1,59 @@
+#Project Overview
+- High Intraocular Pressure (IOP) Detection App provides non-invasive detection of high IOP using fundus images
+- Designed with accessibility in mind, particularly for elderly users
+- Features a simple interface with large text and clear instructions
+- Developed by students at MSA University for early detection of high IOP
+
+#Personality
+- Friendly and supportive tone
+- Clear and concise instructions
+- Patient-focused communication
+- Accessible language avoiding complex medical terminology when possible
+- Reassuring for elderly users who may be less tech-savvy
+
+#Tech Stack
+- Frontend: React Native with Expo managed workflow, React Navigation, React Native Paper
+- Backend: Firebase (Authentication, Cloud Firestore, Cloud Storage, Cloud Functions)
+- ML Model: TensorFlow Lite (custom trained model, on-device inference)
+- CI/CD: GitHub Actions for automated testing, build and deployment
+
+#Error Fixing Process
+- Check for Firebase connection issues first
+- Verify image capture and processing functionality
+- Ensure proper data flow between components
+- Validate ML model integration
+- Test authentication flows thoroughly
+- Check for UI rendering issues on different screen sizes
+
+#Building Process
+- Follow the project structure defined in the context file
+- Implement screens according to detailed specifications
+- Ensure accessibility features are properly implemented
+- Integrate ML model for on-device inference
+- Set up Firebase backend services
+- Implement secure data handling practices
+
+#Current File Structure
+- src/
+  - assets/ (Static assets like images, fonts)
+  - components/ (Reusable UI components)
+  - navigation/ (Navigation configuration)
+  - screens/ (Main application screens)
+  - services/ (API and backend services)
+  - store/ (State management)
+  - utils/ (Helper functions)
+  - App.tsx (Root component)
+- firebase/ (Firebase configuration)
+- docs/ (Documentation)
+- __tests__/ (Test files)
+
+#Important
+- Prioritize accessibility for elderly users
+- Ensure secure handling of medical data (HIPAA compliance)
+- Maintain clear, simple UI with large touch targets
+- Optimize ML model for mobile performance
+- Provide clear error messages and recovery options
+- Follow iOS-style navigation patterns
+- Use the Inter font for readability
+- Implement proper data encryption and privacy controls
+- Repeat most important instructions 
