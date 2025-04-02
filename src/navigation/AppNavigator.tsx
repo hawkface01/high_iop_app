@@ -10,7 +10,7 @@ import RegisterScreen from '../screens/Auth/RegisterScreen';
 
 // App Screens
 import HomeScreen from '../screens/Home/HomeScreen';
-import CaptureScreen from '../screens/Scan/CaptureScreen';
+import ScanInitiationScreen from '../screens/Scan/ScanInitiationScreen';
 import HistoryScreen from '../screens/History/HistoryScreen';
 import SettingsScreen from '../screens/Settings/SettingsScreen';
 import EditProfileScreen from '../screens/Settings/EditProfileScreen';
@@ -81,7 +81,7 @@ const MainTabs = () => {
       />
       <Tab.Screen 
         name="Scan" 
-        component={CaptureScreen}
+        component={ScanInitiationScreen}
         options={{
           title: 'Scan',
           tabBarIcon: ({ color, size, focused }: { color: string, size: number, focused: boolean }) => (

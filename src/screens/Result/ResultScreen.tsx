@@ -43,17 +43,6 @@ const ResultScreen = () => {
     }
   };
 
-  const viewDetails = () => {
-    // Navigate to ScanDetail screen with scan parameters
-    navigation.navigate('ScanDetail', {
-      result,
-      pressure,
-      date,
-      imageUrl,
-      fromResult: true
-    });
-  };
-
   const getResultColor = () => {
     return result === 'Normal' ? colors.success : colors.error;
   };
@@ -112,12 +101,12 @@ const ResultScreen = () => {
           </Button>
           <Button
             mode="outlined"
-            onPress={viewDetails}
+            onPress={() => navigation.navigate('MainTabs')}
             style={styles.secondaryButton}
             contentStyle={styles.buttonContent}
             labelStyle={styles.buttonLabel}
           >
-            View Details
+            Return to Home
           </Button>
         </View>
       </View>

@@ -195,13 +195,7 @@ const ScanDetailScreen = () => {
 
   // Delete scan from database
   const deleteScan = async () => {
-    if (!user || !scanData || !params.scanId) {
-      console.error('Missing required data for deletion:', { user: !!user, scanData: !!scanData, scanId: params.scanId });
-      Alert.alert('Error', 'Cannot delete scan: missing required information.');
-      return;
-    }
-    
-    console.log('Starting deletion process for scan ID:', params.scanId);
+    if (!user || !scanData || !params.scanId) return;
     
     // Show confirmation dialog
     Alert.alert(
@@ -217,8 +211,6 @@ const ScanDetailScreen = () => {
               setDeleting(true);
               setError(null);
               
-              console.log('Deletion confirmed by user, proceeding with deletion of scan ID:', params.scanId);
-              
               // First, try to delete the image from storage if it's stored in Supabase
               if (scanData.image_url && scanData.image_url.includes('supabase')) {
                 try {
@@ -226,8 +218,6 @@ const ScanDetailScreen = () => {
                   const urlParts = scanData.image_url.split('/');
                   const fileName = urlParts[urlParts.length - 1];
                   const filePath = `${user.id}/${fileName}`;
-                  
-                  console.log('Attempting to delete image from storage:', filePath);
                   
                   // Delete the file from storage
                   const { error: deleteImageError } = await supabase.storage
@@ -237,8 +227,6 @@ const ScanDetailScreen = () => {
                   if (deleteImageError) {
                     console.warn('Error deleting image:', deleteImageError);
                     // Continue with scan deletion even if image deletion fails
-                  } else {
-                    console.log('Successfully deleted image from storage');
                   }
                 } catch (imageError) {
                   console.warn('Error processing image deletion:', imageError);
@@ -246,55 +234,17 @@ const ScanDetailScreen = () => {
                 }
               }
               
-              // Verify scan exists before deletion
-              console.log('Verifying scan exists before deletion...');
-              const { data: scanExists, error: scanCheckError } = await supabase
-                .from('scan_results')
-                .select('id')
-                .eq('id', params.scanId)
-                .single();
-                
-              if (scanCheckError) {
-                console.warn('Error verifying scan exists:', scanCheckError);
-                // Continue anyway and attempt deletion
-              } else if (!scanExists) {
-                console.warn('Scan not found in database, may have been already deleted');
-                setDeleting(false);
-                Alert.alert('Warning', 'Scan was not found in the database. It may have been already deleted.');
-                return;
-              } else {
-                console.log('Scan verified to exist, proceeding with deletion');
-              }
-              
               // Delete the scan record
-              console.log('Executing database deletion query for scan ID:', params.scanId);
-              const { data: deletedData, error: deleteError } = await supabase
+              const { error: deleteError } = await supabase
                 .from('scan_results')
                 .delete()
-                .eq('id', params.scanId)
-                .select();
+                .eq('id', params.scanId);
                 
               if (deleteError) {
-                console.error('Database deletion error:', deleteError);
                 throw deleteError;
               }
               
-              console.log('Deletion successful, response:', deletedData);
-              setDeleting(false);
-              
-              // Verify deletion was successful
-              const { data: checkData, error: checkError } = await supabase
-                .from('scan_results')
-                .select('id')
-                .eq('id', params.scanId)
-                .single();
-                
-              if (!checkError && checkData) {
-                console.error('Deletion verification failed - scan still exists in database');
-                throw new Error('Deletion verification failed - scan still exists in database');
-              } else {
-                console.log('Deletion verified - scan no longer exists in database');
-              }
+              setDeleting(false); // Reset deleting state after successful deletion
               
               Alert.alert(
                 'Success',
@@ -308,12 +258,6 @@ const ScanDetailScreen = () => {
               console.error('Error deleting scan:', error);
               setError('Failed to delete scan. Please try again.');
               setDeleting(false);
-              
-              Alert.alert(
-                'Deletion Error',
-                'There was a problem deleting the scan. Please try again or contact support if the problem persists.',
-                [{ text: 'OK' }]
-              );
             }
           }
         }

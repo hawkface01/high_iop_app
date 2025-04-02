@@ -1,5 +1,5 @@
 {
-  "extends": "expo/tsconfig.base",
+  "extends": "./node_modules/expo/tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
     "allowSyntheticDefaultImports": true,
@@ -9,11 +9,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "baseUrl": ".",
-    "paths": {
-      "*": ["node_modules/*"]
-    },
-    "types": ["react-native", "node", "expo-image-picker"]
+    "baseUrl": "."
   },
   "exclude": [
     "node_modules",
