@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
-import { TextInput, Button } from 'react-native-paper';
+import { TextInput } from 'react-native-paper';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../../utils/theme';
 import { useAuth } from '../../store/AuthContext';
@@ -11,45 +11,66 @@ const SignupScreen = () => {
   const [password, setPassword] = useState('');
   const [secureTextEntry, setSecureTextEntry] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
   const navigation = useNavigation();
   const { signup, user } = useAuth();
 
-  // Auto navigate when user is authenticated
   useEffect(() => {
+    console.log('SignupScreen useEffect triggered. User:', user ? user.id : 'null');
     if (user) {
-      console.log('User is authenticated after signup, navigating to Main screen');
-      // Navigate to the main screen
+      console.log('User detected, attempting navigation to MainTabs...');
+      setStatusMessage('Login successful! Redirecting...');
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Main' }],
+        routes: [{ name: 'MainTabs' }],
       });
     }
   }, [user, navigation]);
 
   const handleSignup = async () => {
+    console.log('handleSignup started (Basic Test)');
+    setLoading(true);
+    setStatusMessage('Button pressed! Testing UI update...');
+
+    setTimeout(() => {
+      console.log('Resetting loading state (Basic Test)');
+      setLoading(false);
+      setStatusMessage('Test complete.');
+    }, 2000);
+
+    /* --- Original code temporarily commented out for testing ---
     // Validate inputs
     if (!fullName || !email || !password) {
+      setStatusMessage('Error: Please fill in all fields'); // UI Feedback
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
     if (password.length < 6) {
+      setStatusMessage('Error: Password must be at least 6 characters long'); // UI Feedback
       Alert.alert('Error', 'Password must be at least 6 characters long');
       return;
     }
 
     try {
+      setStatusMessage(''); // Clear previous messages
       setLoading(true);
-      console.log('Attempting signup with:', email);
-      const newUser = await signup(email, password, fullName);
-      console.log('Signup successful:', newUser?.email);
-      
-      // Navigation will happen in the useEffect above when user state updates
+      setStatusMessage('Creating account...'); // UI Feedback
+      console.log('Attempting signup with:', email); // Log attempt
+      // Call signup but don't assign the result (it's void)
+      await signup(email, password, fullName);
+      console.log('Signup function call completed successfully.'); // Log success
+      setStatusMessage('Account created. Awaiting login confirmation...'); // UI Feedback
+      // Keep loading indicator active until useEffect navigates
+
     } catch (error: any) {
-      Alert.alert('Signup Failed', error.message || 'Could not create account. Please try again.');
-      console.error('Signup error:', error);
-      setLoading(false);
+      console.error('Signup error in handleSignup:', error); // Log error details
+      const errorMessage = error.message || 'Could not create account. Please try again.';
+      setStatusMessage(`Error: ${errorMessage}`); // UI Feedback with error
+      Alert.alert('Signup Failed', errorMessage);
+      setLoading(false); // Stop loading on error
     }
+    --- End of original code --- */
   };
 
   return (
@@ -106,16 +127,21 @@ const SignupScreen = () => {
             }
           />
 
-          <Button
-            mode="contained"
-            onPress={handleSignup}
-            style={styles.button}
-            labelStyle={styles.buttonLabel}
-            loading={loading}
+          <TouchableOpacity 
+            onPress={handleSignup} 
+            style={[styles.button, loading && styles.buttonDisabled]}
             disabled={loading}
           >
-            Sign Up
-          </Button>
+            {loading ? (
+              <Text style={styles.buttonLabel}>Loading...</Text>
+            ) : (
+              <Text style={styles.buttonLabel}>Sign Up</Text>
+            )}
+          </TouchableOpacity>
+
+          {statusMessage ? (
+            <Text style={styles.statusText}>{statusMessage}</Text>
+          ) : null}
         </View>
 
         <View style={styles.footer}>
@@ -147,12 +173,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
     marginBottom: 8,
-    
   },
   subtitle: {
     fontSize: 16,
     color: colors.placeholder,
-    
   },
   form: {
     marginBottom: 24,
@@ -170,10 +194,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     marginTop: 8,
   },
+  buttonDisabled: {
+    backgroundColor: colors.disabled,
+  },
   buttonLabel: {
     fontSize: 16,
     fontWeight: '600',
-    
+  },
+  statusText: {
+    marginTop: 16,
+    textAlign: 'center',
+    fontSize: 14,
+    color: colors.placeholder,
   },
   footer: {
     flexDirection: 'row',
@@ -183,13 +215,11 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     color: colors.text,
-    
   },
   loginText: {
     fontSize: 14,
     color: colors.primary,
     fontWeight: '600',
-    
   },
 });
 

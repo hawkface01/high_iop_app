@@ -60,8 +60,13 @@ DROP FUNCTION IF EXISTS public.handle_new_user();
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.profiles (id, full_name, email)
-    VALUES (new.id, new.raw_user_meta_data->>'full_name', new.email);
+    -- Insert the new user's id, email, and name (from metadata) into the profiles table
+    INSERT INTO public.profiles (id, email, name)
+    VALUES (
+      new.id, 
+      new.email, 
+      new.raw_user_meta_data ->> 'name' -- Extract name from metadata
+    );
     RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

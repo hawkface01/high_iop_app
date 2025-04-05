@@ -68,24 +68,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!authData.user) throw new Error('No user data returned');
 
       // Then create their profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: authData.user.id,
-            name,
-            email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ]);
+      // Removed the manual insert block that conflicted with the DB trigger
 
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
-        // If profile creation fails, we should delete the auth user
-        await supabase.auth.signOut();
-        throw new Error('Failed to create user profile');
-      }
+      // The trigger 'on_auth_user_created' in Supabase handles profile creation.
     } catch (error) {
       console.error('Signup error:', error);
       Alert.alert('Error', error instanceof Error ? error.message : 'An unknown error occurred');

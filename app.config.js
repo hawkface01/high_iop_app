@@ -48,6 +48,19 @@ export default {
           // "cameraRollPermission": // For older iOS versions if needed
         }
       ]
-    ]
+    ],
+    // Enable new architecture
+    newArchEnabled: true,
+    // Add gesture handler configuration
+    hooks: {
+      postPublish: [
+        {
+          file: "node_modules/react-native-gesture-handler/scripts/post-publish.js",
+          config: {
+            root: "node_modules/react-native-gesture-handler"
+          }
+        }
+      ]
+    }
   }
 }; 

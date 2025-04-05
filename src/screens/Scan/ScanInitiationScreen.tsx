@@ -3,162 +3,276 @@ import {
   View,
   StyleSheet,
   Alert,
-  Platform,
-  Image,
   TouchableOpacity,
+  SafeAreaView,
+  ActivityIndicator,
+  Modal as RNModal,
 } from "react-native";
 import { Text, Button } from "react-native-paper";
-import { useNavigation } from "@react-navigation/native";
-import { colors, spacing } from "../../utils/theme";
-import { SafeAreaView } from "react-native-safe-area-context";
-import * as ImagePicker from "expo-image-picker";
+import { useNavigation, useIsFocused } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
+import { colors, spacing } from "../../utils/theme"; // Assuming theme file path
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs'; // Import the hook
+import {
+  loadModel,
+  preprocessImage,
+  runInference,
+  postprocessResult,
+  IOPResult,
+  testModelUrl,  // Import the new test function
+  clearModelCache,  // Import the new clearModelCache function
+} from "../../services/ml/mlService"; // Import ML service functions
 
-// This is a placeholder screen for initiating a scan.
-// It should contain the UI described in CONTEXT.md for the "Eye Scan Screen"
-// (e.g., alignment guide, upload button, camera button).
+// Define proper navigation types if available, e.g., using StackNavigationProp
+// type ScanInitiationScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ScanInitiation'>;
 
 const ScanInitiationScreen = () => {
-  const navigation = useNavigation<any>(); // Define proper navigation types later
+  // Use the specific navigation type if defined
+  // const navigation = useNavigation<ScanInitiationScreenNavigationProp>();
+  const navigation = useNavigation<any>(); // Using any for now
+  const isFocused = useIsFocused(); // Check if the screen is focused
+
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [mediaLibraryPermission, requestMediaLibraryPermission] =
     ImagePicker.useMediaLibraryPermissions();
   const [showCamera, setShowCamera] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false); // State for loading indicator
   const cameraRef = useRef<CameraView>(null);
+  const tabBarHeight = useBottomTabBarHeight(); // Get tab bar height
 
-  const navigateToProcessing = (imageUri: string) => {
-    console.log("Navigating with image URI:", imageUri);
-    // Navigate to a processing or result screen (replace 'Result' as needed)
-    navigation.navigate("Result", {
-      imageUrl: imageUri,
-      result: "PENDING", // Placeholder values
-      pressure: 0,
-      date: new Date().toISOString(),
-    });
-  };
-
-  const handleUpload = async () => {
-    // Request permission if not granted
-    if (!mediaLibraryPermission?.granted) {
-      const { status } = await requestMediaLibraryPermission();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "Media library access is needed to upload photos."
-        );
-        return;
+  // Effect to turn off camera when screen loses focus
+  useEffect(() => {
+    if (!isFocused) {
+      if (showCamera) {
+        console.log("Screen lost focus, turning off camera.");
+        setShowCamera(false);
+      }
+      if (isProcessing) {
+        console.log("Screen lost focus during processing, resetting state.");
+        setIsProcessing(false);
       }
     }
+  }, [isFocused, showCamera, isProcessing]);
 
-    // Launch image library
+  // Function to navigate after getting an image URI
+  const handleImageCaptured = async (imageUri: string) => {
+    console.log("Processing image URI:", imageUri);
+    setShowCamera(false);
+    setIsProcessing(true);
+
+    let finalResult: IOPResult | null = null;
+
+    try {
+      // First test if the model URL is accessible
+      const isModelUrlAccessible = await testModelUrl();
+      if (!isModelUrlAccessible) {
+        throw new Error("Model URL is not accessible. Please check your connection and Supabase settings.");
+      }
+
+      // Clear any potentially corrupted cache first
+      console.log("Clearing any existing model cache...");
+      await clearModelCache();
+
+      console.log("Loading model with force reload...");
+      const model = await loadModel(true); // Force a fresh download
+      if (!model) throw new Error("Failed to load the ML model.");
+
+      console.log("Preprocessing image...");
+      const tensor = await preprocessImage(imageUri);
+      if (!tensor) throw new Error("Failed to preprocess the image.");
+
+      console.log("Running inference...");
+      const prediction = await runInference(model, tensor);
+      if (!prediction) throw new Error("Failed to run inference.");
+
+      console.log("Postprocessing result...");
+      finalResult = await postprocessResult(prediction);
+      if (finalResult.classification === 'Error') {
+        throw new Error("Failed to process the model output.");
+      }
+
+      console.log("ML Processing successful:", finalResult);
+
+      // Navigate to Results Screen (Ensure 'Results' matches your stack navigator's screen name)
+      navigation.navigate("Results", { 
+        scanResult: finalResult,
+        imageUri: imageUri,
+      });
+
+    } catch (error: any) {
+      console.error("ML Processing Error:", error);
+      Alert.alert(
+        "Processing Failed",
+        `An error occurred during analysis: ${error.message || "Unknown error"}. Please try again.`
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Function to handle image upload from library
+  const handleUpload = async () => {
+    let permission = mediaLibraryPermission;
+    if (!permission?.granted) {
+      permission = await requestMediaLibraryPermission();
+    }
+
+    if (!permission?.granted) {
+      Alert.alert(
+        "Permission Required",
+        "Media library access is needed to upload photos."
+      );
+      return;
+    }
+
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
+        aspect: [1, 1], // Square aspect ratio for fundus images
+        quality: 0.8, // Slightly reduced quality for faster processing
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        navigateToProcessing(result.assets[0].uri);
+        handleImageCaptured(result.assets[0].uri); // Use the updated handler
       }
     } catch (error) {
       console.error("ImagePicker Error:", error);
-      Alert.alert("Error", "Could not open image library.");
+      Alert.alert("Error", "Could not open image library. Please try again.");
     }
   };
 
+  // Function to handle pressing the 'Use Camera' button
   const handleCameraPress = async () => {
-    // Request permission if not granted
-    if (!cameraPermission?.granted) {
-      const { status } = await requestCameraPermission();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "Camera access is needed to take photos."
-        );
-        return;
-      }
+    let permission = cameraPermission;
+    if (!permission?.granted) {
+      permission = await requestCameraPermission();
     }
-    // Show camera view
+
+    if (!permission?.granted) {
+      Alert.alert("Permission Required", "Camera access is needed to take photos.");
+      return;
+    }
     setShowCamera(true);
   };
 
+  // Function to take a picture using the camera
   const takePicture = async () => {
-    if (cameraRef.current) {
-      try {
-        const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+    if (!cameraRef.current) {
+      console.warn("Camera ref not available.");
+      return;
+    }
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.8,
+        // Consider adding base64: false if not needed, potentially faster
+      });
 
-        if (photo?.uri) {
-          setShowCamera(false);
-          navigateToProcessing(photo.uri);
-        } else {
-          Alert.alert("Error", "Could not capture image. Please try again.");
-          setShowCamera(false);
-        }
-      } catch (error) {
-        console.error("Camera Error:", error);
-        Alert.alert("Error", "Could not take picture.");
-        setShowCamera(false);
+      if (photo?.uri) {
+        handleImageCaptured(photo.uri); // Use the updated handler
+      } else {
+        Alert.alert("Capture Failed", "Could not capture image. Please try again.");
+        setShowCamera(false); // Hide camera on failure
       }
+    } catch (error) {
+      console.error("Camera Error:", error);
+      Alert.alert("Camera Error", "Could not take picture. Please try again.");
+      setShowCamera(false); // Hide camera on error
     }
   };
 
-  // Render Camera View if showCamera is true
-  if (showCamera) {
-    console.log("Rendering CameraView. Permission granted:", cameraPermission?.granted);
+  // Render Camera View
+  const renderCameraView = () => {
+    if (!cameraPermission?.granted) {
+      // This should ideally not be reached due to checks in handleCameraPress,
+      // but serves as a fallback.
+      return (
+        <View style={styles.centered}>
+          <Text>Camera permission is required.</Text>
+          <Button onPress={requestCameraPermission}>Grant Permission</Button>
+          <Button onPress={() => setShowCamera(false)}>Back</Button>
+        </View>
+      );
+    }
+
     return (
-      <View style={styles.fullScreenCameraContainer}>
+      <View style={styles.fullScreen}>
         <CameraView
-          style={styles.cameraPreview}
+          style={StyleSheet.absoluteFill} // Use absoluteFill for simplicity
           facing="back"
           ref={cameraRef}
-          // autofocus={'off'} // Temporarily removed
-          // flash={'off'} // Temporarily removed
           onCameraReady={() => console.log("Camera hardware is ready")}
         />
-        {/* Camera UI Overlay */}
-        <View style={styles.cameraOverlay}>
-          <View style={styles.cameraFramePlaceholder} />
+
+        {/* Overlay with alignment guide */}
+        <View style={[StyleSheet.absoluteFill, styles.overlayContainer]}>
+          <View style={styles.focusFrame} />
         </View>
-        {/* Camera Controls */}
-        <View style={styles.cameraControls}>
+
+        {/* Controls at the bottom */}
+        <View style={[styles.controlsContainer, { bottom: tabBarHeight }]}>
+          {/* Close Button */}
           <TouchableOpacity
             onPress={() => setShowCamera(false)}
-            style={styles.cameraButton}
+            style={styles.controlButton}
           >
-            <Ionicons name="close" size={40} color="white" />
+            <Ionicons name="close" size={35} color="white" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={takePicture} style={styles.cameraButton}>
-            <Ionicons name="ellipse-outline" size={80} color="white" />
+
+          {/* Capture Button */}
+          <TouchableOpacity onPress={takePicture} style={styles.captureButton}>
+            <View style={styles.captureButtonInner} />
           </TouchableOpacity>
-          <View style={{ width: 40 }} />
+
+          {/* Spacer to balance layout */}
+          <View style={styles.controlButton} />
         </View>
       </View>
     );
-  }
+  };
 
   // Render Initial Screen View
-  return (
+  const renderInitialView = () => (
     <SafeAreaView style={styles.container}>
+      {/* Loading Modal using standard RN Modal */}
+      <RNModal
+        transparent={true}
+        animationType="fade"
+        visible={isProcessing}
+        onRequestClose={() => { /* Prevent closing via back button */ }}
+      >
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator animating={true} size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Analyzing image...</Text>
+            <Text style={styles.loadingSubText}>This may take a moment.</Text>
+          </View>
+        </View>
+      </RNModal>
+
       <View style={styles.content}>
         <Text variant="headlineMedium" style={styles.title}>
-          Eye Scan
+          Start Eye Scan
         </Text>
         <Text variant="bodyLarge" style={styles.instruction}>
-          Center your fundus image in the frame or upload one.
+          Position your eye within the guide or upload a fundus image.
         </Text>
 
-        {/* Alignment frame placeholder */}
-        <View style={styles.framePlaceholder} />
+        {/* Placeholder for alignment guide preview */}
+        <View style={styles.guidePlaceholder}>
+           <Ionicons name="eye-outline" size={80} color={colors.primaryLight} />
+        </View>
 
         <Button
           mode="contained"
           icon="camera"
           onPress={handleCameraPress}
-          style={styles.button}
+          style={styles.actionButton}
           labelStyle={styles.buttonLabel}
+          contentStyle={styles.buttonContent} // Ensure icon and label are spaced
+          disabled={isProcessing} // Disable while processing
         >
           Use Camera
         </Button>
@@ -166,99 +280,165 @@ const ScanInitiationScreen = () => {
           mode="outlined"
           icon="upload"
           onPress={handleUpload}
-          style={[styles.button, styles.uploadButton]}
+          style={[styles.actionButton, styles.uploadButton]}
           labelStyle={styles.buttonLabel}
+          contentStyle={styles.buttonContent}
+          disabled={isProcessing} // Disable while processing
         >
           Upload Photo
         </Button>
       </View>
     </SafeAreaView>
   );
+
+  // Main render logic
+  return showCamera ? renderCameraView() : renderInitialView();
 };
 
 const styles = StyleSheet.create({
+  // General & Initial View Styles
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background ?? '#f5f5f5', // Fallback color
   },
   content: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.large ?? 20,
+  },
+  centered: { // For permission messages or errors
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.large,
   },
   title: {
-    marginBottom: spacing.medium,
-    color: colors.text,
+    marginBottom: spacing.medium ?? 15,
+    color: colors.text ?? '#000000',
+    textAlign: 'center',
   },
   instruction: {
-    marginBottom: spacing.large,
+    marginBottom: spacing.large ?? 20,
     textAlign: "center",
-    color: colors.textSecondary,
+    color: colors.textSecondary ?? '#555555',
+    fontSize: 16, // Ensure readability
   },
-  framePlaceholder: {
-    width: 250,
-    height: 250,
-    borderRadius: 125,
+  guidePlaceholder: {
+    width: 180,
+    height: 180,
+    borderRadius: 90, // Make it circular
     borderWidth: 2,
-    borderColor: colors.primary,
+    borderColor: colors.primaryLight ?? colors.primary ?? '#cccccc',
     borderStyle: "dashed",
-    marginBottom: spacing.large,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: (spacing.large ?? 20) * 2,
+    backgroundColor: colors.surface ?? '#eeeeee', // Using surface as fallback for surfaceVariant
   },
-  button: {
-    width: "80%",
-    marginVertical: spacing.small,
-    paddingVertical: spacing.small,
+  actionButton: {
+    marginTop: spacing.medium ?? 15,
+    width: "80%", // Ensure buttons have good width
+    paddingVertical: spacing.small ?? 10, // Add padding for better touch area
   },
   uploadButton: {
-    borderColor: colors.primary,
+    borderColor: colors.primary ?? '#6200ee', // Match primary color for outlined
   },
   buttonLabel: {
-    fontSize: 16,
+    fontSize: 16, // Larger text for accessibility
+    fontWeight: "bold",
   },
-  fullScreenCameraContainer: {
+  buttonContent: {
+    height: 50, // Ensure consistent button height
+    justifyContent: 'center',
+  },
+
+  // Camera View Styles
+  fullScreen: {
     flex: 1,
-    backgroundColor: "black",
+    backgroundColor: "black", // Background for camera view
   },
-  cameraPreview: {
-    ...StyleSheet.absoluteFillObject, // Force fill container
-    width: '100%',
-    height: '100%',
-  },
-  cameraOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "transparent",
-    justifyContent: "center",
+  overlayContainer: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent", // Make overlay transparent
   },
-  cameraFramePlaceholder: {
-    width: "80%",
-    aspectRatio: 1,
-    borderRadius: 1000,
-    borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.7)",
+  focusFrame: {
+    width: 300, // Match the expected input size of the model
+    height: 300,
+    borderWidth: 3,
+    borderColor: "rgba(255, 255, 255, 0.7)", // White, semi-transparent
     borderStyle: "dashed",
-    backgroundColor: "transparent",
+    borderRadius: 10, // Slightly rounded corners
+    backgroundColor: "rgba(0, 0, 0, 0.2)", // Dim the area outside the frame slightly
   },
-  cameraControls: {
+  controlsContainer: {
     position: "absolute",
-    bottom: 0,
     left: 0,
     right: 0,
-    height: 120,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    // bottom: 0, // Removed - now dynamically set using tabBarHeight
+    height: 100, // Fixed height for control area
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Semi-transparent background
+    paddingBottom: spacing.medium ?? 15, // Add some padding at the very bottom
   },
-  cameraButton: {
-    // Style for touch targets if needed, e.g., padding
+  controlButton: {
+    padding: spacing.medium ?? 15,
+    width: 70, // Give buttons some width for easier pressing
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captureButton: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "rgba(255, 255, 255, 0.3)", // Slightly visible background
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 4,
+    borderColor: "white",
+  },
+  captureButtonInner: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "white",
+  },
+
+  // Loading Modal Styles (Added Here)
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    backgroundColor: colors.background ?? 'white',
+    padding: (spacing.large ?? 20) * 1.5,
+    borderRadius: 10,
+    alignItems: 'center',
+    width: '70%',
+    elevation: 5, // Android shadow
+    shadowColor: '#000', // iOS shadow
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  loadingText: {
+    marginTop: spacing.medium ?? 15,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text ?? '#000000',
+    textAlign: 'center',
+  },
+  loadingSubText: {
+    marginTop: spacing.small ?? 10,
+    fontSize: 14,
+    color: colors.textSecondary ?? '#555555',
+    textAlign: 'center',
   },
 });
 

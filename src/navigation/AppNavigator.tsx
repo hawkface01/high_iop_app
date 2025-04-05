@@ -3,6 +3,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../store/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Auth Screens
 import LoginScreen from '../screens/Auth/LoginScreen';
@@ -39,6 +40,8 @@ type MainTabParamList = {
 };
 
 const MainTabs = () => {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }: { route: { name: keyof MainTabParamList } }) => ({
@@ -63,12 +66,17 @@ const MainTabs = () => {
         tabBarStyle: {
           borderTopWidth: 1,
           borderTopColor: colors.border,
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom,
+          paddingBottom: 8 + insets.bottom,
           paddingTop: 8,
+          backgroundColor: colors.surface,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
         },
         tabBarLabelStyle: {
-          
+          fontSize: 12,
         },
       })}
     >
@@ -84,13 +92,6 @@ const MainTabs = () => {
         component={ScanInitiationScreen}
         options={{
           title: 'Scan',
-          tabBarIcon: ({ color, size, focused }: { color: string, size: number, focused: boolean }) => (
-            <Ionicons 
-              name={focused ? 'camera' : 'camera-outline'} 
-              size={size} 
-              color={color} 
-            />
-          ),
         }}
       />
       <Tab.Screen 
@@ -120,7 +121,12 @@ const AppNavigator = () => {
   }
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        cardStyle: { backgroundColor: colors.background },
+      }}
+    >
       {!user ? (
         // Auth Stack
         <>
