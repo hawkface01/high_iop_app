@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../store/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RouteProp } from '@react-navigation/native';
 
 // Auth Screens
 import LoginScreen from '../screens/Auth/LoginScreen';
@@ -21,7 +22,9 @@ import TermsOfServiceScreen from '../screens/Settings/TermsOfServiceScreen';
 import ChangePasswordScreen from '../screens/Settings/ChangePasswordScreen';
 import ResultScreen from '../screens/Result/ResultScreen';
 import ScanDetailScreen from '../screens/Scan/ScanDetailScreen';
+import ScanNavigator from './ScanNavigator';
 import { colors } from '../utils/theme';
+import { MainTabParamList, AppStackParamList } from './types';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -32,25 +35,18 @@ type TabBarIconProps = {
   size: number;
 };
 
-type MainTabParamList = {
-  Home: undefined;
-  Scan: undefined;
-  History: undefined;
-  Settings: undefined;
-};
-
 const MainTabs = () => {
   const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }: { route: { name: keyof MainTabParamList } }) => ({
+      screenOptions={({ route }: { route: RouteProp<MainTabParamList, keyof MainTabParamList> }) => ({
         tabBarIcon: ({ focused, color, size }: TabBarIconProps) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'help-circle';
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Scan') {
+          } else if (route.name === 'ScanStack') {
             iconName = focused ? 'camera' : 'camera-outline';
           } else if (route.name === 'History') {
             iconName = focused ? 'time' : 'time-outline';
@@ -88,8 +84,8 @@ const MainTabs = () => {
         }}
       />
       <Tab.Screen 
-        name="Scan" 
-        component={ScanInitiationScreen}
+        name="ScanStack"
+        component={ScanNavigator}
         options={{
           title: 'Scan',
         }}

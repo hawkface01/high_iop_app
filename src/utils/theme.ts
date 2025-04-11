@@ -39,6 +39,7 @@ export const colors = {
   disabled: '#BDBDBD',   // Gray for disabled elements
   scanButton: '#2196F3', // Same as primary for consistency
   historyItem: '#F5F5F5', // White background for history items
+  accent: '#1ABC9C', // Added accent color (Teal)
 };
 
 // Spacing values for consistent layout
@@ -103,12 +104,97 @@ export const shadows = {
   }),
 };
 
+// Typography settings (using common scale)
+// You might want to integrate specific fonts (like Inter) here later
+export const typography = {
+  // Font weights
+  fontWeightLight: '300' as const,
+  fontWeightRegular: '400' as const,
+  fontWeightMedium: '500' as const,
+  fontWeightBold: '700' as const,
+
+  // Font sizes based on Material Design type scale (adjust as needed)
+  headlineLarge: {
+    fontSize: 32,
+    fontWeight: '400' as const,
+    lineHeight: 40,
+    letterSpacing: 0,
+  },
+  headlineMedium: {
+    fontSize: 28,
+    fontWeight: '400' as const,
+    lineHeight: 36,
+    letterSpacing: 0,
+  },
+  headlineSmall: {
+    fontSize: 24,
+    fontWeight: '400' as const,
+    lineHeight: 32,
+    letterSpacing: 0,
+  },
+  titleLarge: {
+    fontSize: 22,
+    fontWeight: '500' as const, // Medium weight for titles
+    lineHeight: 28,
+    letterSpacing: 0.15,
+  },
+  titleMedium: {
+    fontSize: 16,
+    fontWeight: '500' as const,
+    lineHeight: 24,
+    letterSpacing: 0.15,
+  },
+  titleSmall: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+    lineHeight: 20,
+    letterSpacing: 0.1,
+  },
+  labelLarge: {
+    fontSize: 14,
+    fontWeight: '500' as const,
+    lineHeight: 20,
+    letterSpacing: 0.1,
+  },
+  labelMedium: {
+    fontSize: 12,
+    fontWeight: '500' as const,
+    lineHeight: 16,
+    letterSpacing: 0.5,
+  },
+  labelSmall: {
+    fontSize: 11,
+    fontWeight: '500' as const,
+    lineHeight: 16,
+    letterSpacing: 0.5,
+  },
+  bodyLarge: {
+    fontSize: 16,
+    fontWeight: '400' as const,
+    lineHeight: 24,
+    letterSpacing: 0.5,
+  },
+  bodyMedium: {
+    fontSize: 14,
+    fontWeight: '400' as const,
+    lineHeight: 20,
+    letterSpacing: 0.25,
+  },
+  bodySmall: {
+    fontSize: 12,
+    fontWeight: '400' as const,
+    lineHeight: 16,
+    letterSpacing: 0.4,
+  },
+};
+
 // Default theme object
 export const theme = {
   colors,
   spacing,
   borderRadius,
   shadows,
+  typography, // Include typography in the main theme export
 };
 
 export const layout = {
