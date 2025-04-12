@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Button, Text, Image, Alert, ActivityIndicator, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, Image, Alert, ActivityIndicator, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { Button as PaperButton } from 'react-native-paper';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { formatISO } from 'date-fns';
+
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../store/AuthContext';
 
 import { InferenceService } from '../../services/inferenceService';
 import { colors, typography } from '../../utils/theme';
@@ -12,6 +17,7 @@ type DetectionScreenRouteProp = RouteProp<ScanStackParamList, 'Detection'>;
 const DetectionScreen = () => {
   const route = useRoute<DetectionScreenRouteProp>();
   const navigation = useNavigation();
+  const { user } = useAuth();
 
   const imageUriFromParam = route.params?.imageUri;
 
@@ -19,6 +25,7 @@ const DetectionScreen = () => {
   const [isLoadingModel, setIsLoadingModel] = useState(!InferenceService.isModelLoaded());
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<{ probability?: number; prediction?: string; error?: string } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({ title: 'Run IOP Detection' });
@@ -79,14 +86,104 @@ const DetectionScreen = () => {
       if (!rawOutput) throw new Error('Model inference failed.');
 
       const finalResult = InferenceService.postprocessOutput(rawOutput);
-      setResult(finalResult);
       console.log('DetectionScreen: Detection complete.');
+      setResult(finalResult);
 
     } catch (error: any) {
       console.error('DetectionScreen: Detection pipeline error:', error);
       setResult({ error: error.message || 'An unknown error occurred.' });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleSaveScan = async () => {
+    if (!user || !result || result.error || !imageUri || result.probability === undefined) {
+      Alert.alert('Error', 'Cannot save scan. Missing required information.');
+      return;
+    }
+
+    // --- TEST NETWORK --- 
+    try {
+      console.log('Testing network connection...');
+      const testResponse = await fetch('https://jsonplaceholder.typicode.com/todos/1');
+      if (!testResponse.ok) {
+        throw new Error(`Test fetch failed with status: ${testResponse.status}`);
+      }
+      const testJson = await testResponse.json();
+      console.log('Network test successful:', testJson.title);
+    } catch (networkTestError: any) {
+      console.error('Network test failed:', networkTestError);
+      Alert.alert('Network Error', `Could not connect to the internet. Please check your connection. Details: ${networkTestError.message}`);
+      setIsSaving(false); // Stop the saving process if network test fails
+      return;
+    }
+    // --- END TEST NETWORK ---
+
+    setIsSaving(true);
+    try {
+      let imageUrl = imageUri;
+      if (imageUrl.startsWith('file://') || imageUrl.startsWith('content://')) {
+        console.log('Uploading image to storage...');
+        try {
+          const fileName = imageUrl.split('/').pop() || `scan-${Date.now()}.jpg`;
+          const filePath = `${user.id}/${fileName}`;
+          const response = await fetch(imageUrl);
+          const blob = await response.blob();
+
+          const { data: fileData, error: uploadError } = await supabase.storage
+            .from('eye_scans')
+            .upload(filePath, blob, {
+              contentType: 'image/jpeg',
+              cacheControl: '3600'
+            });
+
+          if (uploadError) {
+            throw new Error(`Failed to upload image: ${uploadError.message}`); 
+          }
+
+          const { data: urlData } = await supabase.storage
+            .from('eye_scans')
+            .getPublicUrl(filePath);
+
+          imageUrl = urlData.publicUrl;
+          console.log('Image uploaded successfully:', imageUrl);
+        } catch (uploadErr: any) { 
+          console.log('Continuing with local image URI (upload failed silently)');
+        }
+      }
+
+      const scanResultType: 'Normal' | 'High' = result.prediction === 'High IOP Risk' ? 'High' : 'Normal';
+      const pressureValue = result.probability * 100; 
+      const currentDate = formatISO(new Date());
+
+      const scanRecord = {
+        user_id: user.id,
+        result: scanResultType,
+        pressure: pressureValue,
+        image_url: imageUrl,
+        created_at: currentDate,
+      };
+
+      const { error: insertError } = await supabase
+        .from('scan_results')
+        .insert([scanRecord]);
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      Alert.alert(
+        'Success',
+        'Scan saved successfully to your history!',
+        [{ text: 'OK', onPress: () => navigation.navigate('MainTabs', { screen: 'History' }) }] 
+      );
+
+    } catch (error: any) {
+      console.error('Error saving scan:', error);
+      Alert.alert('Save Failed', `Could not save scan: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -147,7 +244,9 @@ const DetectionScreen = () => {
                   color={result.prediction === 'High IOP Risk' ? colors.warning : colors.success}
                 />
                 <View>
-                    <Text style={styles.predictionText}>{result.prediction}</Text>
+                    <Text style={styles.predictionText}>
+                      {result.prediction === 'High IOP Risk' ? 'High IOP' : 'Normal IOP'}
+                    </Text>
                     {result.probability !== undefined && (
                         <Text style={styles.probabilityText}>
                             Probability: {(result.probability * 100).toFixed(1)}%
@@ -157,6 +256,21 @@ const DetectionScreen = () => {
             </View>
           )}
           <Text style={styles.disclaimer}>Disclaimer: This is not a medical diagnosis. Consult a healthcare professional.</Text>
+
+          {!result.error && (
+            <PaperButton
+              mode="contained"
+              onPress={handleSaveScan}
+              loading={isSaving}
+              disabled={isSaving || isProcessing}
+              style={styles.saveButton}
+              contentStyle={styles.buttonContent}
+              labelStyle={styles.buttonLabel}
+              icon="content-save-outline"
+            >
+              Save Scan to History
+            </PaperButton>
+          )}
         </View>
       )}
     </ScrollView>
@@ -249,40 +363,55 @@ const styles = StyleSheet.create({
     ...typography.titleLarge,
     marginBottom: 15,
     color: colors.text,
+    fontWeight: 'bold',
   },
   predictionText: {
-      ...typography.headlineSmall,
-      marginLeft: 15,
+    ...typography.headlineSmall,
+    marginLeft: 10,
   },
   probabilityText: {
-    ...typography.bodyMedium,
-    color: colors.textSecondary,
-    marginLeft: 15,
-  },
-  errorContainer: {
-    borderColor: colors.error,
-    backgroundColor: '#fee'
+      ...typography.bodyMedium,
+      marginLeft: 10,
+      color: colors.textSecondary,
   },
   errorText: {
-    ...typography.bodyLarge,
-    color: colors.error,
-    marginLeft: 15,
-    flexShrink: 1,
-  },
-  highRiskContainer: {
-    borderColor: colors.warning,
-    backgroundColor: '#fff8e1'
-  },
-  lowRiskContainer: {
-     borderColor: colors.success,
-    backgroundColor: '#e8f5e9'
+      ...typography.bodyLarge,
+      color: colors.error,
+      marginLeft: 10,
+      textAlign: 'center',
+      flexShrink: 1,
   },
   disclaimer: {
       ...typography.bodySmall,
       color: colors.textSecondary,
       marginTop: 15,
       textAlign: 'center',
-  }
+  },
+  errorContainer: {
+      borderColor: colors.error,
+      backgroundColor: colors.error + '10',
+  },
+  highRiskContainer: {
+      borderColor: colors.warning,
+      backgroundColor: colors.warning + '10',
+  },
+  lowRiskContainer: {
+      borderColor: colors.success,
+      backgroundColor: colors.success + '10',
+  },
+  saveButton: {
+    marginTop: 20,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+  },
+  buttonContent: {
+    height: 50,
+  },
+  buttonLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
 });
 
 export default DetectionScreen; 

@@ -50,7 +50,7 @@ const HomeScreen = () => {
   useEffect(() => {
     fetchProfile();
     fetchLastScan();
-  }, []);
+  }, [user]);
 
   const fetchProfile = async () => {
     try {
@@ -138,9 +138,6 @@ const HomeScreen = () => {
           color: lastScan.result === 'Normal' ? colors.success : colors.error 
         }]}>
           {lastScan.result}
-        </Text>
-        <Text style={styles.pressureText}>
-          {lastScan.pressure} <Text style={styles.unitText}>mmHg</Text>
         </Text>
         <Text style={styles.activityDate}>
           {formatDistanceToNow(new Date(lastScan.created_at), {

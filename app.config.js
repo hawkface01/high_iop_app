@@ -1,53 +1,57 @@
-require('dotenv').config(); // Load .env file
+require("dotenv").config(); // Load .env file
 
 export default {
   expo: {
-    name: 'high_iop_app',
-    slug: 'high_iop_app',
-    version: '1.0.0',
-    orientation: 'portrait',
-    icon: './assets/icon.png',
-    userInterfaceStyle: 'light',
+    name: "high_iop_app",
+    slug: "high_iop_app",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "light",
     splash: {
-      image: './assets/splash.png',
-      resizeMode: 'contain',
-      backgroundColor: '#ffffff'
+      image: "./assets/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff",
     },
     ios: {
-      supportsTablet: true
+      supportsTablet: true,
+      bundleIdentifier: "com.bishoyshohdy.highiopapp"
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#ffffff'
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#ffffff",
       },
-      package: "com.bishoyshohdy.high_iop_app"
+      package: "com.bishoyshohdy.high_iop_app",
     },
     web: {
-      favicon: './assets/favicon.png'
+      favicon: "./assets/favicon.png",
     },
     extra: {
       supabaseUrl: process.env.SUPABASE_URL,
       supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
       eas: {
-        projectId: 'YOUR_EAS_PROJECT_ID' // Replace if using EAS Build
-      }
+        projectId: "a2fadca1-3156-4877-b643-1168957acb86",
+      },
     },
     plugins: [
-      'expo-secure-store',
+      "expo-dev-client",
+      "expo-secure-store",
       [
-        'expo-camera',
+        "expo-camera",
         {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera for eye scanning."
-        }
+          cameraPermission:
+            "Allow $(PRODUCT_NAME) to access your camera for eye scanning.",
+        },
       ],
       [
-        'expo-image-picker',
+        "expo-image-picker",
         {
-          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to upload fundus images.",
+          photosPermission:
+            "Allow $(PRODUCT_NAME) to access your photos to upload fundus images.",
           // "cameraRollPermission": // For older iOS versions if needed
-        }
-      ]
+        },
+      ],
     ],
     // Enable new architecture
     newArchEnabled: true,
@@ -57,10 +61,10 @@ export default {
         {
           file: "node_modules/react-native-gesture-handler/scripts/post-publish.js",
           config: {
-            root: "node_modules/react-native-gesture-handler"
-          }
-        }
-      ]
-    }
-  }
-}; 
+            root: "node_modules/react-native-gesture-handler",
+          },
+        },
+      ],
+    },
+  },
+};

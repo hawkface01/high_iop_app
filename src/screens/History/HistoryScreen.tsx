@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, SectionList, RefreshControl, Platform } from 'react-native';
+import { View, StyleSheet, SectionList, RefreshControl, Platform, Image } from 'react-native';
 import { Text, Surface, ActivityIndicator, IconButton } from 'react-native-paper';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../store/AuthContext';
@@ -7,6 +7,7 @@ import { colors, spacing, shadows } from '../../utils/theme';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { useFocusEffect } from '@react-navigation/core';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface ScanResult {
   id: string;
@@ -97,16 +98,27 @@ const HistoryScreen = () => {
     <Surface style={[styles.resultCard, shadows.medium]}>
       <View style={styles.cardContent}>
         <View style={styles.leftContent}>
-          <View style={[styles.resultIndicator, { 
-            backgroundColor: item.result === 'Normal' ? colors.success : colors.error 
-          }]} />
+          {item.image_url ? (
+            <Image 
+              source={{ uri: item.image_url }} 
+              style={styles.thumbnailImage} 
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.thumbnailPlaceholder}>
+              <Ionicons name="image-outline" size={24} color={colors.placeholder} />
+            </View>
+          )}
           <View style={styles.textContainer}>
             <Text style={styles.timeText}>
               {format(parseISO(item.created_at), 'h:mm a')}
             </Text>
+            {/* Comment out the pressure display */}
+            {/* 
             <Text style={styles.pressureText}>
               {item.pressure} <Text style={styles.unitText}>mmHg</Text>
             </Text>
+            */}
           </View>
         </View>
         <View style={styles.rightContent}>
@@ -233,12 +245,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: spacing.small,
   },
-  resultIndicator: {
-    width: 4,
-    height: 40,
-    borderRadius: 2,
+  thumbnailImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
     marginRight: spacing.medium,
+    backgroundColor: colors.border,
+  },
+  thumbnailPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: spacing.medium,
+    backgroundColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   textContainer: {
     flex: 1,
