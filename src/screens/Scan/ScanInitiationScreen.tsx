@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, typography } from "../../utils/theme";
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ScanStackNavigationProp } from '../../navigation/types';
+import { isImageBlurry } from '../../utils/imageUtils';
 
 const ScanInitiationScreen = () => {
   const navigation = useNavigation<ScanStackNavigationProp>();
@@ -25,6 +26,7 @@ const ScanInitiationScreen = () => {
   const [showCamera, setShowCamera] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const tabBarHeight = useBottomTabBarHeight();
+  const [processingImage, setProcessingImage] = useState(false);
 
   useEffect(() => {
     if (!isFocused && showCamera) {
@@ -39,6 +41,7 @@ const ScanInitiationScreen = () => {
   };
 
   const handleUpload = async () => {
+    if (processingImage) return;
     let permission = mediaLibraryPermission;
     if (!permission?.granted) {
       permission = await requestMediaLibraryPermission();
@@ -48,6 +51,7 @@ const ScanInitiationScreen = () => {
       return;
     }
 
+    setProcessingImage(true);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -56,15 +60,24 @@ const ScanInitiationScreen = () => {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        navigateToDetection(result.assets[0].uri);
+        const imageUri = result.assets[0].uri;
+        const blurry = await isImageBlurry(imageUri);
+        if (blurry) {
+          Alert.alert("Image Quality Issue", "The selected image appears to be blurry or shaky. Please choose a clearer image.");
+          return;
+        }
+        navigateToDetection(imageUri);
       }
     } catch (error) {
       console.error("ImagePicker Error:", error);
       Alert.alert("Error", "Could not open image library. Please try again.");
+    } finally {
+      setProcessingImage(false);
     }
   };
 
   const handleCameraPress = async () => {
+    if (processingImage) return;
     let permission = cameraPermission;
     if (!permission?.granted) {
       permission = await requestCameraPermission();
@@ -77,10 +90,18 @@ const ScanInitiationScreen = () => {
   };
 
   const takePicture = async () => {
+    if (!cameraRef.current || processingImage) return;
     if (!cameraRef.current) return;
+    setProcessingImage(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 1 });
       if (photo?.uri) {
+        const blurry = await isImageBlurry(photo.uri);
+        if (blurry) {
+          Alert.alert("Image Quality Issue", "The captured image appears to be blurry or shaky. Please try taking a clearer picture.");
+          // Optionally, keep camera open: setShowCamera(true) or handle retake logic
+          return; 
+        }
         setShowCamera(false);
         navigateToDetection(photo.uri);
       } else {
@@ -90,7 +111,9 @@ const ScanInitiationScreen = () => {
     } catch (error) {
       console.error("Camera Error:", error);
       Alert.alert("Camera Error", "Could not take picture. Please try again.");
-      setShowCamera(false);
+      setShowCamera(false); // Ensure camera closes on error
+    } finally {
+      setProcessingImage(false);
     }
   };
 
@@ -153,7 +176,7 @@ const ScanInitiationScreen = () => {
           style={styles.button}
           labelStyle={styles.buttonLabel}
           contentStyle={styles.buttonContent}
-          disabled={showCamera}
+          disabled={showCamera || processingImage}
         >
           Use Camera
         </Button>
@@ -165,7 +188,7 @@ const ScanInitiationScreen = () => {
           style={styles.button}
           labelStyle={styles.buttonLabel}
           contentStyle={styles.buttonContent}
-          disabled={showCamera}
+          disabled={showCamera || processingImage}
         >
           Upload Image
         </Button>
